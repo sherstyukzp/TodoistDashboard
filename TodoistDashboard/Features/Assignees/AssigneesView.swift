@@ -7,7 +7,7 @@ struct AssigneesView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if appState.allCollaborators.isEmpty {
+                if appState.allCollaborators.isEmpty && appState.currentUser == nil {
                     noCollaboratorsView
                 } else {
                     collaboratorsContent
@@ -142,10 +142,30 @@ struct AssigneesView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     SectionHeader(title: "Unassigned Tasks")
 
-                    Text("\(unassigned.count) tasks without assignee")
+                    Text("\(unassigned.count) tasks without explicit assignee")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal)
+
+                    // Show unassigned tasks grouped by project
+                    let grouped = Dictionary(grouping: unassigned, by: { $0.projectId })
+                    ForEach(Array(grouped.keys.sorted()), id: \.self) { projectId in
+                        if let project = appState.projects.first(where: { $0.id == projectId }) {
+                            HStack {
+                                Circle()
+                                    .fill(AppTheme.projectColor(for: project.color))
+                                    .frame(width: 10, height: 10)
+                                Text(project.name)
+                                    .font(.subheadline)
+                                Spacer()
+                                Text("\(grouped[projectId]?.count ?? 0)")
+                                    .font(.subheadline)
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
                 }
             }
         }

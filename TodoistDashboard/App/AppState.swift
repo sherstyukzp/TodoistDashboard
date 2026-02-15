@@ -147,6 +147,14 @@ final class AppState: ObservableObject {
     var allCollaborators: [Collaborator] {
         var seen = Set<String>()
         var result: [Collaborator] = []
+
+        // Include the current user as a team member
+        if let user = currentUser {
+            seen.insert(user.id)
+            result.append(Collaborator(id: user.id, name: user.displayName, email: user.email))
+        }
+
+        // Add collaborators from shared projects
         for collabs in collaborators.values {
             for c in collabs {
                 if !seen.contains(c.id) {
@@ -155,6 +163,15 @@ final class AppState: ObservableObject {
                 }
             }
         }
+
+        // Add any assignees found in tasks that are not yet in the list
+        for task in tasks {
+            if let assigneeId = task.assigneeId, !seen.contains(assigneeId) {
+                seen.insert(assigneeId)
+                result.append(Collaborator(id: assigneeId, name: "User \(assigneeId)", email: ""))
+            }
+        }
+
         return result
     }
 

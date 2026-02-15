@@ -181,11 +181,32 @@ struct TodoistTask: Codable, Identifiable {
         priority = (try? c.decode(Int.self, forKey: .priority)) ?? 1
         due = try? c.decodeIfPresent(DueDate.self, forKey: .due)
         labels = (try? c.decode([String].self, forKey: .labels)) ?? []
-        assigneeId = try? c.decodeIfPresent(String.self, forKey: .assigneeId)
-        assignerId = try? c.decodeIfPresent(String.self, forKey: .assignerId)
+        // assigneeId can be String or Int from API
+        if let strVal = try? c.decodeIfPresent(String.self, forKey: .assigneeId) {
+            assigneeId = strVal
+        } else if let intVal = try? c.decodeIfPresent(Int.self, forKey: .assigneeId) {
+            assigneeId = String(intVal)
+        } else {
+            assigneeId = nil
+        }
+        // assignerId can be String or Int from API
+        if let strVal = try? c.decodeIfPresent(String.self, forKey: .assignerId) {
+            assignerId = strVal
+        } else if let intVal = try? c.decodeIfPresent(Int.self, forKey: .assignerId) {
+            assignerId = String(intVal)
+        } else {
+            assignerId = nil
+        }
         commentCount = try? c.decodeIfPresent(Int.self, forKey: .commentCount)
         createdAt = try? c.decodeIfPresent(String.self, forKey: .createdAt)
-        creatorId = try? c.decodeIfPresent(String.self, forKey: .creatorId)
+        // creatorId can be String or Int from API
+        if let strVal = try? c.decodeIfPresent(String.self, forKey: .creatorId) {
+            creatorId = strVal
+        } else if let intVal = try? c.decodeIfPresent(Int.self, forKey: .creatorId) {
+            creatorId = String(intVal)
+        } else {
+            creatorId = nil
+        }
         url = try? c.decodeIfPresent(String.self, forKey: .url)
         isCompleted = try? c.decodeIfPresent(Bool.self, forKey: .isCompleted)
         deadline = try? c.decodeIfPresent(Deadline.self, forKey: .deadline)
@@ -284,6 +305,12 @@ struct Collaborator: Codable, Identifiable, Hashable {
     static func == (lhs: Collaborator, rhs: Collaborator) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 
+    init(id: String, name: String, email: String) {
+        self.id = id
+        self.name = name
+        self.email = email
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         if let strId = try? c.decode(String.self, forKey: .id) {
@@ -338,7 +365,14 @@ struct CompletedTask: Codable, Identifiable {
         projectId = (try? c.decode(String.self, forKey: .projectId)) ?? ""
         sectionId = try? c.decodeIfPresent(String.self, forKey: .sectionId)
         completedAt = (try? c.decode(String.self, forKey: .completedAt)) ?? ""
-        userId = try? c.decodeIfPresent(String.self, forKey: .userId)
+        // userId can be String or Int from API
+        if let strVal = try? c.decodeIfPresent(String.self, forKey: .userId) {
+            userId = strVal
+        } else if let intVal = try? c.decodeIfPresent(Int.self, forKey: .userId) {
+            userId = String(intVal)
+        } else {
+            userId = nil
+        }
     }
 }
 
