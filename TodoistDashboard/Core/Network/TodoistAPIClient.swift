@@ -171,6 +171,61 @@ actor TodoistAPIClient {
         return allTasks
     }
 
+    // MARK: - Sync API (for collaborators)
+
+    func fetchCollaborators() async throws -> SyncResponse {
+        try await enforceRateLimit()
+
+        guard let url = URL(string: "\(baseURL)/sync") else {
+            throw TodoistError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+
+        // Request only collaborators and collaborator_states
+        let body = "sync_token=*&resource_types=[\"collaborators\",\"collaborator_states\"]"
+        request.httpBody = body.data(using: .utf8)
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw TodoistError.invalidResponse
+        }
+
+        #if DEBUG
+        let preview = String(data: data.prefix(1000), encoding: .utf8) ?? "<binary>"
+        print("📡 /sync (collaborators) → \(httpResponse.statusCode)")
+        print("   Response preview: \(preview.prefix(300))")
+        #endif
+
+        switch httpResponse.statusCode {
+        case 200..<300:
+            do {
+                return try decoder.decode(SyncResponse.self, from: data)
+            } catch {
+                #if DEBUG
+                print("❌ Decode error for /sync: \(error)")
+                let preview = String(data: data.prefix(2000), encoding: .utf8) ?? ""
+                print("   Full response: \(preview)")
+                #endif
+                throw TodoistError.decodingError("/sync: \(error.localizedDescription)")
+            }
+        case 401:
+            throw TodoistError.unauthorized
+        case 403:
+            throw TodoistError.forbidden
+        case 429:
+            throw TodoistError.rateLimited
+        case 500..<600:
+            throw TodoistError.serverError(httpResponse.statusCode)
+        default:
+            throw TodoistError.apiError(statusCode: httpResponse.statusCode)
+        }
+    }
+
     // MARK: - Activity Log
 
     func fetchActivity(limit: Int = 50, eventType: String? = nil, projectId: String? = nil) async throws -> [ActivityEvent] {

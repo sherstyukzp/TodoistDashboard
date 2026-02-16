@@ -320,12 +320,75 @@ struct Collaborator: Codable, Identifiable, Hashable {
         } else {
             id = ""
         }
-        name = (try? c.decode(String.self, forKey: .name)) ?? "Unknown"
+        // Sync API uses "full_name", REST API uses "name"
+        if let fullName = try? c.decode(String.self, forKey: .fullName) {
+            name = fullName
+        } else if let nameVal = try? c.decode(String.self, forKey: .name) {
+            name = nameVal
+        } else {
+            name = "Unknown"
+        }
         email = (try? c.decode(String.self, forKey: .email)) ?? ""
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, email
+        case fullName = "full_name"
+    }
+}
+
+// MARK: - Collaborator State (from Sync API)
+
+struct CollaboratorState: Codable {
+    let projectId: String
+    let userId: String
+    let state: String
+    let isDeleted: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case projectId = "project_id"
+        case userId = "user_id"
+        case state
+        case isDeleted = "is_deleted"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        projectId = (try? c.decode(String.self, forKey: .projectId)) ?? ""
+        // userId can be String or Int
+        if let strVal = try? c.decode(String.self, forKey: .userId) {
+            userId = strVal
+        } else if let intVal = try? c.decode(Int.self, forKey: .userId) {
+            userId = String(intVal)
+        } else {
+            userId = ""
+        }
+        state = (try? c.decode(String.self, forKey: .state)) ?? "active"
+        isDeleted = (try? c.decode(Bool.self, forKey: .isDeleted)) ?? false
+    }
+}
+
+// MARK: - Sync Response
+
+struct SyncResponse: Codable {
+    let collaborators: [Collaborator]
+    let collaboratorStates: [CollaboratorState]
+    let syncToken: String
+    let fullSync: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case collaborators
+        case collaboratorStates = "collaborator_states"
+        case syncToken = "sync_token"
+        case fullSync = "full_sync"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        collaborators = (try? c.decode([Collaborator].self, forKey: .collaborators)) ?? []
+        collaboratorStates = (try? c.decode([CollaboratorState].self, forKey: .collaboratorStates)) ?? []
+        syncToken = (try? c.decode(String.self, forKey: .syncToken)) ?? ""
+        fullSync = (try? c.decode(Bool.self, forKey: .fullSync)) ?? false
     }
 }
 

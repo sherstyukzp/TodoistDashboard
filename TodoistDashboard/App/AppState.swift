@@ -74,18 +74,50 @@ final class AppState: ObservableObject {
             let sectionsResponse: [TodoistSection] = try await client.fetchAll(endpoint: "/sections")
             sections = sectionsResponse
 
-            // 5. Fetch collaborators for shared projects
-            for project in projects {
-                do {
-                    let collabs: [Collaborator] = try await client.request(
-                        endpoint: "/projects/\(project.id)/collaborators"
-                    )
-                    if !collabs.isEmpty {
-                        collaborators[project.id] = collabs
-                    }
-                } catch {
-                    // Some projects may not support collaborators
+            // 5. Fetch collaborators via Sync API
+            do {
+                let syncResponse = try await client.fetchCollaborators()
+
+                #if DEBUG
+                print("✅ Fetched \(syncResponse.collaborators.count) collaborators")
+                print("✅ Fetched \(syncResponse.collaboratorStates.count) collaborator states")
+                for collab in syncResponse.collaborators {
+                    print("   - Collaborator: \(collab.name) (ID: \(collab.id))")
                 }
+                #endif
+
+                // Build project-to-collaborators mapping from collaborator_states
+                var projectCollabsMap: [String: [Collaborator]] = [:]
+
+                for state in syncResponse.collaboratorStates {
+                    // Only include active, non-deleted collaborators
+                    guard state.state == "active" && !state.isDeleted else { continue }
+
+                    // Find the collaborator info
+                    if let collab = syncResponse.collaborators.first(where: { $0.id == state.userId }) {
+                        if projectCollabsMap[state.projectId] == nil {
+                            projectCollabsMap[state.projectId] = []
+                        }
+                        projectCollabsMap[state.projectId]?.append(collab)
+                    }
+                }
+
+                collaborators = projectCollabsMap
+
+                #if DEBUG
+                print("✅ Built collaborators map for \(projectCollabsMap.keys.count) projects")
+                for (projectId, collabs) in projectCollabsMap {
+                    if let project = projects.first(where: { $0.id == projectId }) {
+                        print("   - \(project.name): \(collabs.map { $0.name }.joined(separator: ", "))")
+                    }
+                }
+                #endif
+            } catch {
+                #if DEBUG
+                print("⚠️ Failed to fetch collaborators via sync API: \(error.localizedDescription)")
+                #endif
+                // Continue without collaborators
+                collaborators = [:]
             }
 
             // 6. Fetch completed tasks (last 3 months)
