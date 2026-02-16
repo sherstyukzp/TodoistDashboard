@@ -579,3 +579,17 @@ struct UserStats: Codable {
     }
 }
 
+// MARK: - Member Statistics
+struct MemberStatistics {
+    let activeTasks: Int
+    let completedTasks: Int
+    let overdueTasks: Int
+    let highPriorityTasks: Int
+    let dueToday: Int
+    let dueThisWeek: Int
+    let completedLast30Days: Int
+    let completionRate: Double
+    let highPriorityPercentage: Double
+}
+
+

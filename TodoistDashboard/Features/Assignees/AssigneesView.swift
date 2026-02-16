@@ -67,6 +67,9 @@ struct AssigneesView: View {
     private var collaboratorsContent: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // Team overview stats
+                teamOverviewSection
+                
                 // Workload Comparison
                 workloadComparisonChart
 
@@ -78,8 +81,6 @@ struct AssigneesView: View {
                         NavigationLink(destination: AssigneeDetailView(collaborator: collab)) {
                             AssigneeCard(
                                 collaborator: collab,
-                                tasks: appState.tasks(assignedTo: collab.id),
-                                completed: appState.completedTasks(assignedTo: collab.id),
                                 colorIndex: appState.allCollaborators.firstIndex(of: collab) ?? 0
                             )
                         }
@@ -92,6 +93,55 @@ struct AssigneesView: View {
                 unassignedSection
             }
             .padding(.vertical)
+        }
+    }
+    
+    // MARK: - Team Overview
+    
+    private var teamOverviewSection: some View {
+        let allStats = sortedCollaborators.map { appState.statistics(for: $0.id) }
+        let totalActive = allStats.reduce(0) { $0 + $1.activeTasks }
+        let totalCompleted = allStats.reduce(0) { $0 + $1.completedTasks }
+        let totalOverdue = allStats.reduce(0) { $0 + $1.overdueTasks }
+        let totalHighPriority = allStats.reduce(0) { $0 + $1.highPriorityTasks }
+        
+        return VStack(spacing: 12) {
+            SectionHeader(title: "Team Overview")
+            
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                StatCard(
+                    title: "Total Active",
+                    value: "\(totalActive)",
+                    icon: "person.3",
+                    color: .blue,
+                    subtitle: "Across \(sortedCollaborators.count) members"
+                )
+                
+                StatCard(
+                    title: "Completed",
+                    value: "\(totalCompleted)",
+                    icon: "checkmark.circle",
+                    color: .green,
+                    subtitle: totalActive + totalCompleted > 0 ? "\(Int(Double(totalCompleted) / Double(totalActive + totalCompleted) * 100))% completion rate" : "No tasks"
+                )
+                
+                StatCard(
+                    title: "Overdue",
+                    value: "\(totalOverdue)",
+                    icon: "exclamationmark.triangle",
+                    color: totalOverdue > 0 ? .red : .green,
+                    subtitle: totalActive > 0 ? "\(Int(Double(totalOverdue) / Double(totalActive) * 100))% of active" : "Nothing overdue"
+                )
+                
+                StatCard(
+                    title: "High Priority",
+                    value: "\(totalHighPriority)",
+                    icon: "flag.fill",
+                    color: .orange,
+                    subtitle: totalActive > 0 ? "\(Int(Double(totalHighPriority) / Double(totalActive) * 100))% of active" : "No urgent tasks"
+                )
+            }
+            .padding(.horizontal)
         }
     }
 
@@ -197,53 +247,90 @@ struct AssigneesView: View {
 // MARK: - Assignee Card
 
 struct AssigneeCard: View {
+    @EnvironmentObject var appState: AppState
     let collaborator: Collaborator
-    let tasks: [TodoistTask]
-    let completed: [CompletedTask]
     let colorIndex: Int
 
     private var color: Color {
         AppTheme.chartColors[colorIndex % AppTheme.chartColors.count]
     }
+    
+    private var stats: MemberStatistics {
+        appState.statistics(for: collaborator.id)
+    }
 
     var body: some View {
-        HStack(spacing: 14) {
-            AvatarCircle(initials: collaborator.initials, size: 44, color: color)
+        VStack(spacing: 12) {
+            HStack(spacing: 14) {
+                AvatarCircle(initials: collaborator.initials, size: 44, color: color)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(collaborator.name)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(collaborator.name)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
 
+                    HStack(spacing: 8) {
+                        Label("\(stats.activeTasks) active", systemImage: "circle")
+                        Label("\(stats.completedTasks) done", systemImage: "checkmark.circle")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    if stats.overdueTasks > 0 {
+                        Text("\(stats.overdueTasks)")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(.red)
+                        Text("overdue")
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                    } else if stats.highPriorityTasks > 0 {
+                        Text("\(stats.highPriorityTasks)")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(.orange)
+                        Text("high priority")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                    }
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.quaternary)
+            }
+            
+            // Quick stats bar
+            if stats.activeTasks > 0 {
                 HStack(spacing: 8) {
-                    Label("\(tasks.count) active", systemImage: "circle")
-                    Label("\(completed.count) done", systemImage: "checkmark.circle")
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 4) {
-                let overdue = tasks.filter { $0.isOverdue }.count
-                if overdue > 0 {
-                    Text("\(overdue)")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.red)
-                    Text("overdue")
-                        .font(.caption2)
-                        .foregroundStyle(.red)
+                    if stats.dueToday > 0 {
+                        quickStatPill(icon: "calendar.badge.clock", text: "\(stats.dueToday) today", color: .blue)
+                    }
+                    if stats.dueThisWeek > 0 {
+                        quickStatPill(icon: "calendar", text: "\(stats.dueThisWeek) this week", color: .purple)
+                    }
+                    Spacer()
                 }
             }
-
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.quaternary)
         }
         .padding()
         .background(AppTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+    
+    private func quickStatPill(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+            Text(text)
+        }
+        .font(.caption2)
+        .foregroundStyle(color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(color.opacity(0.1))
+        .clipShape(Capsule())
     }
 }
 
@@ -332,14 +419,69 @@ struct AssigneeDetailView: View {
     // MARK: - Stats
 
     private var statsSection: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            StatCard(title: "Active", value: "\(memberTasks.count)", icon: "circle", color: .blue)
-            StatCard(title: "Done", value: "\(completed.count)", icon: "checkmark.circle", color: .green)
-            StatCard(title: "Overdue", value: "\(overdue.count)", icon: "exclamationmark.triangle",
-                     color: overdue.isEmpty ? .green : .red)
-            StatCard(title: "Projects", value: "\(projectsWithTasks.count)", icon: "folder", color: .purple)
+        VStack(spacing: 16) {
+            // Main stats grid
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                StatCard(title: "Active", value: "\(memberTasks.count)", icon: "circle", color: .blue)
+                StatCard(title: "Done", value: "\(completed.count)", icon: "checkmark.circle", color: .green)
+                StatCard(title: "Overdue", value: "\(overdue.count)", icon: "exclamationmark.triangle",
+                         color: overdue.isEmpty ? .green : .red)
+                StatCard(title: "Projects", value: "\(projectsWithTasks.count)", icon: "folder", color: .purple)
+            }
+            
+            // Additional stats
+            let stats = appState.statistics(for: collaborator.id)
+            
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                DetailedStatCard(
+                    title: "Due Today",
+                    value: "\(stats.dueToday)",
+                    subtitle: stats.dueThisWeek > stats.dueToday ? "\(stats.dueThisWeek - stats.dueToday) more this week" : "Nothing else this week",
+                    icon: "calendar.badge.clock",
+                    color: .blue
+                )
+                
+                DetailedStatCard(
+                    title: "High Priority",
+                    value: "\(stats.highPriorityTasks)",
+                    subtitle: stats.activeTasks > 0 ? "\(Int(stats.highPriorityPercentage * 100))% of active" : "No active tasks",
+                    icon: "flag.fill",
+                    color: .orange
+                )
+                
+                DetailedStatCard(
+                    title: "Completed (30d)",
+                    value: "\(stats.completedLast30Days)",
+                    subtitle: stats.completionRate > 0 ? "\(Int(stats.completionRate * 100))% completion rate" : "No data",
+                    icon: "checkmark.circle.fill",
+                    color: .green
+                )
+                
+                DetailedStatCard(
+                    title: "Workload",
+                    value: workloadLevel(for: stats),
+                    subtitle: "\(stats.activeTasks) total tasks",
+                    icon: "chart.bar.fill",
+                    color: workloadColor(for: stats)
+                )
+            }
         }
         .padding(.horizontal)
+    }
+    
+    private func workloadLevel(for stats: MemberStatistics) -> String {
+        if stats.activeTasks == 0 { return "Light" }
+        if stats.activeTasks <= 5 { return "Light" }
+        if stats.activeTasks <= 15 { return "Medium" }
+        if stats.activeTasks <= 30 { return "Heavy" }
+        return "Very Heavy"
+    }
+    
+    private func workloadColor(for stats: MemberStatistics) -> Color {
+        if stats.activeTasks <= 5 { return .green }
+        if stats.activeTasks <= 15 { return .blue }
+        if stats.activeTasks <= 30 { return .orange }
+        return .red
     }
 
     // MARK: - Priority Breakdown

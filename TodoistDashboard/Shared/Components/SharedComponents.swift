@@ -37,6 +37,47 @@ struct StatCard: View {
     }
 }
 
+// MARK: - Detailed Stat Card
+
+struct DetailedStatCard: View {
+    let title: String
+    let value: String
+    let subtitle: String
+    let icon: String
+    var color: Color = .blue
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundStyle(color)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    Text(value)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(color)
+                }
+                
+                Spacer()
+            }
+            
+            Text(subtitle)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(AppTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+}
+
 // MARK: - Priority Badge
 
 struct PriorityBadge: View {
@@ -203,6 +244,10 @@ struct SyncStatusBar: View {
                 ProgressView()
                     .scaleEffect(0.7)
                 Text("Syncing...")
+            case .retrying(let attempt):
+                ProgressView()
+                    .scaleEffect(0.7)
+                Text("Retrying (\(attempt))...")
             case .synced(let date):
                 Image(systemName: "checkmark.icloud")
                     .foregroundStyle(.green)

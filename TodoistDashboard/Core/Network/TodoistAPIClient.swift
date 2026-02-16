@@ -14,8 +14,9 @@ actor TodoistAPIClient {
     init(token: String) {
         self.token = token
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 60
+        config.timeoutIntervalForRequest = 60  // Increased from 30
+        config.timeoutIntervalForResource = 300  // Increased from 60 (5 minutes)
+        config.waitsForConnectivity = true  // Wait for network if unavailable
         self.session = URLSession(configuration: config)
 
         // IMPORTANT: Do NOT use .convertFromSnakeCase since we have explicit CodingKeys
