@@ -208,11 +208,46 @@ final class AppState: ObservableObject {
     }
 
     func tasks(assignedTo userId: String) -> [TodoistTask] {
-        tasks.filter { $0.assigneeId == userId }
+        // For the current user: include explicitly assigned tasks + unassigned tasks in personal projects
+        if userId == currentUser?.id {
+            return tasks.filter { task in
+                task.assigneeId == userId ||
+                (task.assigneeId == nil && !isSharedProject(task.projectId))
+            }
+        }
+        // For other team members: only explicitly assigned tasks
+        return tasks.filter { $0.assigneeId == userId }
     }
 
     func completedTasks(assignedTo userId: String) -> [CompletedTask] {
         completedTasks.filter { $0.userId == userId }
+    }
+
+    /// Projects where this team member has assigned tasks
+    func projects(for userId: String) -> [TodoistProject] {
+        let memberTasks = tasks(assignedTo: userId)
+        let projectIds = Set(memberTasks.map { $0.projectId })
+        return projects.filter { projectIds.contains($0.id) }
+            .sorted { tasks(assignedTo: userId).filter({ $0.projectId == $0.id }).count >
+                      tasks(assignedTo: userId).filter({ $0.projectId == $1.id }).count }
+    }
+
+    /// Shared projects this collaborator belongs to
+    func sharedProjects(for userId: String) -> [TodoistProject] {
+        var result: [TodoistProject] = []
+        for (projectId, collabs) in collaborators {
+            if collabs.contains(where: { $0.id == userId }) {
+                if let project = projects.first(where: { $0.id == projectId }) {
+                    result.append(project)
+                }
+            }
+        }
+        return result
+    }
+
+    /// Check if a project is shared (has collaborators)
+    func isSharedProject(_ projectId: String) -> Bool {
+        collaborators[projectId] != nil && !(collaborators[projectId]?.isEmpty ?? true)
     }
 
     private func formatDateOnly(_ date: Date) -> String {
