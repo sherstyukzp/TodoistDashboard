@@ -20,8 +20,8 @@ struct DashboardView: View {
                         projectProgressSection
                     }
 
-                    // Team Workload (only if collaborators exist)
-                    if !appState.allCollaborators.isEmpty {
+                    // Team Workload (show when there are team members with assigned tasks)
+                    if appState.allCollaborators.contains(where: { !appState.tasks(assignedTo: $0.id).isEmpty }) {
                         teamWorkloadSection
                     }
 

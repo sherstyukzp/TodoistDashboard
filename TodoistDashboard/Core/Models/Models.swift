@@ -181,11 +181,32 @@ struct TodoistTask: Codable, Identifiable {
         priority = (try? c.decode(Int.self, forKey: .priority)) ?? 1
         due = try? c.decodeIfPresent(DueDate.self, forKey: .due)
         labels = (try? c.decode([String].self, forKey: .labels)) ?? []
-        assigneeId = try? c.decodeIfPresent(String.self, forKey: .assigneeId)
-        assignerId = try? c.decodeIfPresent(String.self, forKey: .assignerId)
+        // assigneeId can be String or Int from API
+        if let strVal = try? c.decodeIfPresent(String.self, forKey: .assigneeId) {
+            assigneeId = strVal
+        } else if let intVal = try? c.decodeIfPresent(Int.self, forKey: .assigneeId) {
+            assigneeId = String(intVal)
+        } else {
+            assigneeId = nil
+        }
+        // assignerId can be String or Int from API
+        if let strVal = try? c.decodeIfPresent(String.self, forKey: .assignerId) {
+            assignerId = strVal
+        } else if let intVal = try? c.decodeIfPresent(Int.self, forKey: .assignerId) {
+            assignerId = String(intVal)
+        } else {
+            assignerId = nil
+        }
         commentCount = try? c.decodeIfPresent(Int.self, forKey: .commentCount)
         createdAt = try? c.decodeIfPresent(String.self, forKey: .createdAt)
-        creatorId = try? c.decodeIfPresent(String.self, forKey: .creatorId)
+        // creatorId can be String or Int from API
+        if let strVal = try? c.decodeIfPresent(String.self, forKey: .creatorId) {
+            creatorId = strVal
+        } else if let intVal = try? c.decodeIfPresent(Int.self, forKey: .creatorId) {
+            creatorId = String(intVal)
+        } else {
+            creatorId = nil
+        }
         url = try? c.decodeIfPresent(String.self, forKey: .url)
         isCompleted = try? c.decodeIfPresent(Bool.self, forKey: .isCompleted)
         deadline = try? c.decodeIfPresent(Deadline.self, forKey: .deadline)
@@ -284,6 +305,12 @@ struct Collaborator: Codable, Identifiable, Hashable {
     static func == (lhs: Collaborator, rhs: Collaborator) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 
+    init(id: String, name: String, email: String) {
+        self.id = id
+        self.name = name
+        self.email = email
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         if let strId = try? c.decode(String.self, forKey: .id) {
@@ -293,12 +320,82 @@ struct Collaborator: Codable, Identifiable, Hashable {
         } else {
             id = ""
         }
-        name = (try? c.decode(String.self, forKey: .name)) ?? "Unknown"
+        // Sync API uses "full_name", REST API uses "name"
+        if let fullName = try? c.decode(String.self, forKey: .fullName) {
+            name = fullName
+        } else if let nameVal = try? c.decode(String.self, forKey: .name) {
+            name = nameVal
+        } else {
+            name = "Unknown"
+        }
         email = (try? c.decode(String.self, forKey: .email)) ?? ""
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(email, forKey: .email)
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, email
+        case fullName = "full_name"
+    }
+}
+
+// MARK: - Collaborator State (from Sync API)
+
+struct CollaboratorState: Codable {
+    let projectId: String
+    let userId: String
+    let state: String
+    let isDeleted: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case projectId = "project_id"
+        case userId = "user_id"
+        case state
+        case isDeleted = "is_deleted"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        projectId = (try? c.decode(String.self, forKey: .projectId)) ?? ""
+        // userId can be String or Int
+        if let strVal = try? c.decode(String.self, forKey: .userId) {
+            userId = strVal
+        } else if let intVal = try? c.decode(Int.self, forKey: .userId) {
+            userId = String(intVal)
+        } else {
+            userId = ""
+        }
+        state = (try? c.decode(String.self, forKey: .state)) ?? "active"
+        isDeleted = (try? c.decode(Bool.self, forKey: .isDeleted)) ?? false
+    }
+}
+
+// MARK: - Sync Response
+
+struct SyncResponse: Codable {
+    let collaborators: [Collaborator]
+    let collaboratorStates: [CollaboratorState]
+    let syncToken: String
+    let fullSync: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case collaborators
+        case collaboratorStates = "collaborator_states"
+        case syncToken = "sync_token"
+        case fullSync = "full_sync"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        collaborators = (try? c.decode([Collaborator].self, forKey: .collaborators)) ?? []
+        collaboratorStates = (try? c.decode([CollaboratorState].self, forKey: .collaboratorStates)) ?? []
+        syncToken = (try? c.decode(String.self, forKey: .syncToken)) ?? ""
+        fullSync = (try? c.decode(Bool.self, forKey: .fullSync)) ?? false
     }
 }
 
@@ -338,7 +435,14 @@ struct CompletedTask: Codable, Identifiable {
         projectId = (try? c.decode(String.self, forKey: .projectId)) ?? ""
         sectionId = try? c.decodeIfPresent(String.self, forKey: .sectionId)
         completedAt = (try? c.decode(String.self, forKey: .completedAt)) ?? ""
-        userId = try? c.decodeIfPresent(String.self, forKey: .userId)
+        // userId can be String or Int from API
+        if let strVal = try? c.decodeIfPresent(String.self, forKey: .userId) {
+            userId = strVal
+        } else if let intVal = try? c.decodeIfPresent(Int.self, forKey: .userId) {
+            userId = String(intVal)
+        } else {
+            userId = nil
+        }
     }
 }
 
@@ -474,4 +578,18 @@ struct UserStats: Codable {
         case completedCount = "completed_count"
     }
 }
+
+// MARK: - Member Statistics
+struct MemberStatistics {
+    let activeTasks: Int
+    let completedTasks: Int
+    let overdueTasks: Int
+    let highPriorityTasks: Int
+    let dueToday: Int
+    let dueThisWeek: Int
+    let completedLast30Days: Int
+    let completionRate: Double
+    let highPriorityPercentage: Double
+}
+
 
