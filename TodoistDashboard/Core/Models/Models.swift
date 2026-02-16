@@ -330,6 +330,13 @@ struct Collaborator: Codable, Identifiable, Hashable {
         }
         email = (try? c.decode(String.self, forKey: .email)) ?? ""
     }
+    
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(email, forKey: .email)
+    }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, email
